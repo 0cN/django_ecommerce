@@ -40,14 +40,14 @@ class MainPageTests(TestCase):
 
 	def test_returns_appropiate_html(self):
 		resp = index(self.request) #get() return  the appropiate html
-		self.assertEquals(resp.status_code, 200) #check only the status_code
+		self.assertEqual(resp.status_code, 200) #check only the status_code
 
 
 		#### TESTING TEMPLATES AND VIEWS ####
 
 	def test_returns_exact_html(self):
 		resp = index(self.request)
-		self.assertEquals(
+		self.assertEqual(
 			resp.content, #html of index 
 			render_to_response("index.html").content #html of index.html template
 		)
@@ -75,4 +75,4 @@ class MainPageTests(TestCase):
 			expected_html = render_to_response('user.html', 
 				{'user': user_mock.get_by_id(1)}
 			)
-			self.assertEquals(resp.content, expected_html.content)
+			self.assertEqual(resp.content, expected_html.content)

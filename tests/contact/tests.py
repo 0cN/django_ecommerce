@@ -18,7 +18,7 @@ class UserModelTest(TestCase):
 		cls.firstUser.save()
 
 	def test_contactform_str_returns_email(self):
-		self.assertEquals("first@first.com", str(self.firstUser))
+		self.assertEqual("first@first.com", str(self.firstUser))
 
 	#def test_ordering(self):
 	#	contacts = ContactForm.objects.all()
@@ -29,4 +29,4 @@ class ContactViewTests(SimpleTestCase):
 
 	def test_displayed_fields(self):
 		expected_fields = ['name', 'email', 'topic', 'message']
-		self.assertEquals(ContactView.Meta.fields, expected_fields)
+		self.assertEqual(ContactView.Meta.fields, expected_fields)

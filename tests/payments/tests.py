@@ -31,15 +31,15 @@ class ViewTesterMixin(object):
 
 	def test_resolves_to_correct_view(self):
 		test_view = resolve(self.url)
-		self.assertEquals(test_view.func, self.view_func)
+		self.assertEqual(test_view.func, self.view_func)
 
 	def test_returns_appropiate_response_code(self):
 		resp = self.view_func(self.request)
-		self.assertEquals(resp.status_code, self.status_code)
+		self.assertEqual(resp.status_code, self.status_code)
 
 	def test_returns_correct_html(self):
 		resp = self.view_func(self.request)
-		self.assertEquals(resp.content, self.expected_html)
+		self.assertEqual(resp.content, self.expected_html)
 
 class FormTesterMixin():
 
@@ -50,7 +50,7 @@ class FormTesterMixin():
 
 		self.assertFalse(test_form.is_valid())
 
-		self.assertEquals(test_form.errors[expected_error_name],
+		self.assertEqual(test_form.errors[expected_error_name],
 			expected_error_msg,
 			msg = "Expected {}: Actual {}: using data {}".format(
 				test_form.errors[expected_error_name],
@@ -74,14 +74,14 @@ class UserModelTest(TestCase):
 		cls.test_user.save()
 
 	def test_user_to_string_print_email(self):
-		self.assertEquals(str(self.test_user), 'j@j.com')
+		self.assertEqual(str(self.test_user), 'j@j.com')
 
 	def test_get_by_id(self):
-		self.assertEquals(User.get_by_id(1), self.test_user)
+		self.assertEqual(User.get_by_id(1), self.test_user)
 
 	def test_create_user_function_stores_in_database(self):
 		user = User.create('test', 'test@t.com', 'tt', '1234', '22')
-		self.assertEquals(User.objects.get(email='test@t.com'), user)
+		self.assertEqual(User.objects.get(email='test@t.com'), user)
 
 	def test_create_user_already_exists_throws_IntegrityError(self):
 		from django.db import IntegrityError
@@ -103,9 +103,9 @@ class FormTests(SimpleTestCase, FormTesterMixin):
 
 		invalid_data_list = [
 		{'data': {'email': 'j@j.com'},
-		'error': ('password', [u'This field is required.'])},
+		'error': ('password', ['This field is required.'])},
 		{'data': {'password': '1234'},
-		'error': ('email', [u'This field is required.'])}
+		'error': ('email', ['This field is required.'])}
 	]
 
 
@@ -155,11 +155,11 @@ class FormTests(SimpleTestCase, FormTesterMixin):
 		invalid_data_list = [
 			{
 			'data': {'last_4_digits': '123'},
-			'error': ('last_4_digits',[u'Ensure this value has at least 4 characters (it has 3).'])
+			'error': ('last_4_digits',['Ensure this value has at least 4 characters (it has 3).'])
 			},
 			{
 			'data' : {'last_4_digits': '12345'},
-			'error': ('last_4_digits',[u'Ensure this value has at most 4 characters (it has 5).'])
+			'error': ('last_4_digits',['Ensure this value has at most 4 characters (it has 5).'])
 			}
 		]
 		for invalid_data in invalid_data_list:
@@ -196,7 +196,7 @@ class SignOutPageTests(TestCase, ViewTesterMixin):
 		ViewTesterMixin.setupViewTester(
 			'/sign_out',
 			sign_out,
-			"",
+			b"",
 			status_code = 302,
 			session = {"user": "dummy"},
 		)
@@ -213,11 +213,11 @@ class RegisterPageTests(TestCase, ViewTesterMixin):
 			'register.html',
 			{
 				'form': UserForm(),
-				'months': range(1, 12),
+				'months': list(range(1, 12)),
 				'publishable': settings.STRIPE_PUBLISHABLE,
 				'soon': soon(),
 				'user': None,
-				'years': range(2011, 2036),
+				'years': list(range(2011, 2036)),
 			}
 		)
 
@@ -240,9 +240,9 @@ class RegisterPageTests(TestCase, ViewTesterMixin):
 			self.request.method = 'POST'
 			self.request.POST = None
 			resp = register(self.request)
-			self.assertEquals(resp.content, self.expected_html)
+			self.assertEqual(resp.content, self.expected_html)
 
-			self.assertEquals(user_mock.call_count, 1)
+			self.assertEqual(user_mock.call_count, 1)
 
 	@mock.patch('stripe.Customer.create')
 	@mock.patch.object(User, 'create')
@@ -264,9 +264,9 @@ class RegisterPageTests(TestCase, ViewTesterMixin):
 			#Same as configure_mock(create.return_value=mock.Mock())
 
 		resp = register(self.request)
-		self.assertEquals(resp.content, "")
-		self.assertEquals(resp.status_code, 302)
-		self.assertEquals(self.request.session['user'], new_user.pk)
+		self.assertEqual(resp.content, b"")
+		self.assertEqual(resp.status_code, 302)
+		self.assertEqual(self.request.session['user'], new_user.pk)
 		create_mock.assert_called_with('pyRock', 'python@rocks.com', 'bad_password', '4242',
 			new_cust.id)
 
@@ -297,11 +297,11 @@ class RegisterPageTests(TestCase, ViewTesterMixin):
 					'register.html',
 					{
 						'form': expected_form,
-						'months': range(1, 12),
+						'months': list(range(1, 12)),
 						'publishable': settings.STRIPE_PUBLISHABLE,
 						'soon': soon(),
 						'user': None,
-						'years': range(2011, 2036),
+						'years': list(range(2011, 2036)),
 					}
 				)
 
@@ -314,8 +314,8 @@ class RegisterPageTests(TestCase, ViewTesterMixin):
 					resp = register(self.request)
 					users = User.objects.filter(email = 'python@rocks.com')
 					#self.assertEquals(len(users), 1)
-					self.assertEquals(resp.status_code, 200)
-					self.assertEquals(self.request.session, {})
+					self.assertEqual(resp.status_code, 200)
+					self.assertEqual(self.request.session, {})
 					
 
 
