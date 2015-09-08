@@ -315,11 +315,30 @@ class RegisterPageTests(TestCase, ViewTesterMixin):
 					users = User.objects.filter(email = 'python@rocks.com')
 					#self.assertEquals(len(users), 1)
 					self.assertEqual(resp.status_code, 200)
-					self.assertEqual(self.request.session, {})
-					
-
-
-					
-					
+					self.assertEqual(self.request.session, {})		
 		except IntegrityError:
 			pass
+
+	def test_registering_user_when_stripe_is_down(self):
+
+		self.request.session = {}
+		self.request.method = 'POST'
+		self.request.POST = {
+		'email': 'python@rocks.com',
+		'name': 'pyRock',
+		'stripe_token': '...',
+		'last_4_digits': '4242',
+		'password': 'bad_password',
+		'ver_password': 'bad_password',
+		}
+
+		with mock.patch(
+			'stripe.Customer.create',
+			side_effect = socket.error("Can't connect to Stripe")
+		) as stripe_mock:
+
+			register(self.request)
+
+			users = User.objects.filter(email="python@rocks.com")
+			self.assertEquals(len(users), 1)
+			self.assertEquals(user[0].stripe_id, '')
