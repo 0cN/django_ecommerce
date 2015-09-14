@@ -6,16 +6,17 @@ Replace this with more appropriate tests for your application.
 """
 
 from django.test import SimpleTestCase, TestCase, RequestFactory
-from payments.models import User
+from payments.models import User, UnpaidUsers
 from payments.forms import SigninForm, UserForm, CardForm
 from django import forms
-from payments.views import sign_in, sign_out, soon, register
+from payments.views import sign_in, sign_out, soon, register, Customer
 from django.core.urlresolvers import resolve
 from django.shortcuts import render_to_response
 from django.db import transaction, IntegrityError
 import django_ecommerce.settings as settings
 import mock
 import unittest
+import socket
 
 class ViewTesterMixin(object):
 
@@ -77,7 +78,7 @@ class UserModelTest(TestCase):
 		self.assertEqual(str(self.test_user), 'j@j.com')
 
 	def test_get_by_id(self):
-		self.assertEqual(User.get_by_id(1), self.test_user)
+		self.assertEqual(User.get_by_id(self.test_user.id), self.test_user)
 
 	def test_create_user_function_stores_in_database(self):
 		user = User.create('test', 'test@t.com', 'tt', '1234', '22')
@@ -244,31 +245,63 @@ class RegisterPageTests(TestCase, ViewTesterMixin):
 
 			self.assertEqual(user_mock.call_count, 1)
 
-	@mock.patch('stripe.Customer.create')
-	@mock.patch.object(User, 'create')
-	def test_registering_new_user_returns_successfully(self, create_mock, stripe_mock):
+	def get_mock_cust():
+
+		class mock_cust():
+
+			@property
+			def id(self):
+				return 1234
+
+		return mock_cust()
+
+	@mock.patch('payments.views.Customer.create', return_value = get_mock_cust())
+	def test_registering_new_user_returns_successfully(self, stripe_mock):
 
 		self.request.session = {}
 		self.request.method = 'POST'
 		self.request.POST = {
 			'email': 'python@rocks.com',
 			'name': 'pyRock',
-			'stripe_token': '4242424242424242',
+			'stripe_token': '...',
 			'last_4_digits': '4242',
 			'password': 'bad_password',
 			'ver_password': 'bad_password',
 		}
 
-		new_user = create_mock.return_value
-		new_cust = stripe_mock.return_value
 			#Same as configure_mock(create.return_value=mock.Mock())
 
 		resp = register(self.request)
 		self.assertEqual(resp.content, b"")
 		self.assertEqual(resp.status_code, 302)
-		self.assertEqual(self.request.session['user'], new_user.pk)
-		create_mock.assert_called_with('pyRock', 'python@rocks.com', 'bad_password', '4242',
-			new_cust.id)
+		
+		users = User.objects.filter(email="python@rocks.com")
+		self.assertEqual(len(users), 1)
+		self.assertEqual(users[0].stripe_id, '1234')
+
+	def get_MockUserForm(self):
+
+		from django import forms
+		
+		class MockUserForm(forms.Form):
+
+			def is_valid(self):
+				return True
+
+			@property
+			def cleaned_data(self):
+				return {
+				'email': 'python@rocks.com',
+				'name': 'pyRock',
+				'stripe_token': '...',
+				'last_4_digits': '4242',
+				'password': 'bad_password',
+				'ver_password': 'bad_password',
+				}
+
+			def addError(self, error):
+				pass
+		return MockUserForm()
 
 	def test_registering_user_twice_cause_error_msg(self):
 
@@ -332,13 +365,42 @@ class RegisterPageTests(TestCase, ViewTesterMixin):
 		'ver_password': 'bad_password',
 		}
 
-		with mock.patch(
-			'stripe.Customer.create',
-			side_effect = socket.error("Can't connect to Stripe")
-		) as stripe_mock:
+		with mock.patch('stripe.Customer.create',
+			side_effect = socket.error("Can't connect to Stripe")) as stripe_mock:
 
 			register(self.request)
 
 			users = User.objects.filter(email="python@rocks.com")
 			self.assertEquals(len(users), 1)
-			self.assertEquals(user[0].stripe_id, '')
+			self.assertEquals(users[0].stripe_id, '')
+
+		unpaid = UnpaidUsers.objects.filter(email="python@rocks.com")
+		self.assertEquals(len(unpaid), 1)
+		self.assertIsNotNone(unpaid[0].last_notification)
+
+	@mock.patch('payments.models.UnpaidUsers.save', side_effect=IntegrityError)
+	def test_registering_user_when_strip_is_down_all_or_nothing(self, save_mock):
+
+		self.request.session = {}
+		self.request.method = 'POST'
+		self.request.POST = {
+		'email': 'python@rocks.com',
+		'name': 'pyRock',
+		'stripe_token': '...',
+		'last_4_digits': '4242',
+		'password': 'bad_password',
+		'ver_password': 'bad_password',
+		}
+
+		with mock.patch('stripe.Customer.create', 
+			side_effect=socket.error("Can't connect to Stripe")
+			) as stripe_mock:
+
+			resp = register(self.request)
+
+			users = User.objects.filter(email="python@rocks.com")
+			self.assertEquals(len(users), 0)
+
+			unpaid = UnpaidUsers.objects.filter(email="python@rocks.com")
+			self.assertEquals(len(unpaid), 0)
+
